@@ -1,0 +1,323 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نبرد ریاضی هفتم</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:16px;min-height:100vh;background:#081426;color:#fff;font-family:Tahoma,Arial,sans-serif}
+.container{max-width:650px;margin:auto}
+header{text-align:center;padding:20px 0}
+header h1{color:#61b8ff;font-size:29px}
+.subtitle,.muted{color:#a8bdd6;font-size:14px}
+.card{background:#13243c;border:1px solid #294766;border-radius:20px;padding:22px;margin:14px 0;box-shadow:0 8px 30px #0003}
+input{width:100%;padding:15px;border-radius:12px;border:1px solid #45627f;background:#0b192c;color:white;font-size:17px;margin:12px 0}
+button{border:0;border-radius:12px;padding:14px 18px;font-size:16px;font-weight:bold;cursor:pointer;font-family:inherit}
+.primary{background:#1689ed;color:white;width:100%}
+.option{display:block;width:100%;text-align:right;margin:10px 0;background:#203954;color:white;border:1px solid #3c5874}
+.option:disabled{opacity:1}
+.option.correct{background:#126c51;border-color:#39d7a1}
+.option.wrong{background:#7d293b;border-color:#ff7186}
+.topline{display:flex;justify-content:space-between;gap:10px}
+.stat{background:#0c1b30;border-radius:12px;padding:10px;text-align:center;flex:1;font-size:13px}
+.stat strong{display:block;font-size:20px;color:#68bdff;margin-top:5px}
+.progress{height:9px;background:#263c55;border-radius:20px;overflow:hidden;margin:16px 0}
+.bar{height:100%;background:#29a4ff;width:100%;transition:width 1s linear}
+.question{font-size:22px;line-height:2;text-align:center;margin:20px 0}
+.feedback{text-align:center;min-height:30px;color:#ffd36c;line-height:1.8}
+.hidden{display:none!important}
+.result{text-align:center}
+.big{font-size:42px;color:#65bdff;font-weight:bold}
+.smallbtn{background:#294563;color:white;margin-top:12px}
+#celebration{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:5}
+.particle{position:absolute;top:-30px;font-size:25px;animation:fall 3s linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(700deg);opacity:0}}
+@media(max-width:420px){body{padding:10px}.card{padding:16px}.question{font-size:19px}.stat{padding:8px 4px}}
+</style>
+</head>
+<body>
+<div id="celebration"></div>
+<div class="container">
+<header>
+<div style="font-size:42px">⚔️</div>
+<h1>نبرد ریاضی هفتم</h1>
+<div class="subtitle">چالش جبر و معادله | آماده‌ای قهرمان؟</div>
+</header>
+
+<section id="welcome" class="card">
+<h2>🎮 ورود به مسابقه</h2>
+<p class="muted">نامت را وارد کن و وارد میدان نبرد شو.</p>
+<input id="studentName" maxlength="30" placeholder="نام و نام خانوادگی">
+<button class="primary" onclick="startGame()">شروع مسابقه 🚀</button>
+<p class="muted" style="text-align:center">۳۰ سؤال · هر سؤال ۵۰ ثانیه</p>
+<p id="connection" class="muted" style="text-align:center">در حال اتصال...</p>
+</section>
+
+<section id="game" class="card hidden">
+<div class="topline">
+<div class="stat">سؤال<strong id="number">۱ / ۳۰</strong></div>
+<div class="stat">زمان<strong id="timer">۵۰</strong></div>
+<div class="stat">امتیاز<strong id="score">۰</strong></div>
+</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div id="question" class="question"></div>
+<div id="options"></div>
+<div id="feedback" class="feedback"></div>
+<button id="next" class="primary hidden" onclick="nextQuestion()">سؤال بعدی ←</button>
+</section>
+
+<section id="finish" class="card result hidden">
+<div style="font-size:65px">🏆</div>
+<h2>مسابقه تمام شد!</h2>
+<div class="big" id="finalScore"></div>
+<p id="summary"></p>
+<p id="saveStatus" class="muted">در حال ذخیره نتیجه...</p>
+<button class="smallbtn" onclick="location.reload()">مسابقه دوباره 🔄</button>
+</section>
+</div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,addDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig={
+apiKey:"AIzaSyCUHYNNXQMKszoHaLQDPtH1fYOcxbc9Z8E",
+authDomain:"math-battle-7.firebaseapp.com",
+projectId:"math-battle-7",
+storageBucket:"math-battle-7.firebasestorage.app",
+messagingSenderId:"290159296023",
+appId:"1:290159296023:web:cc4ce532d4f4d6ff62a652"
+};
+
+let db=null,auth=null;
+try{
+const app=initializeApp(firebaseConfig);
+auth=getAuth(app);
+db=getFirestore(app);
+await signInAnonymously(auth);
+document.getElementById("connection").textContent="اتصال به مسابقه برقرار شد ✅";
+}catch(e){
+console.error(e);
+document.getElementById("connection").textContent="اتصال به Firebase برقرار نشد.";
+}
+
+const questions=[
+{q:"عبارت 3x + 5x − 2x را ساده کن.",a:"6x",o:["6x","10x","4x","8x"]},
+{q:"ضریب x در عبارت 7x + 4 چند است؟",a:"7",o:["7","4","11","3"]},
+{q:"عبارت 4a + 3a را ساده کن.",a:"7a",o:["7a","12a","a","7"]},
+{q:"حاصل 8x − 3x کدام است؟",a:"5x",o:["5x","11x","24x","3x"]},
+{q:"ضریب x در عبارت −6x + 9 چیست؟",a:"−6",o:["−6","9","6","−9"]},
+{q:"معادله x + 7 = 15 را حل کن.",a:"8",o:["8","7","22","9"]},
+{q:"اگر 3x = 21 باشد، x چند است؟",a:"7",o:["7","6","8","9"]},
+{q:"عبارت 5x + 2x − 4x را ساده کن.",a:"3x",o:["3x","11x","7x","x"]},
+{q:"ضریب x در عبارت 12 − 9x چیست؟",a:"−9",o:["−9","12","9","3"]},
+{q:"معادله 2x + 5 = 13 را حل کن.",a:"4",o:["4","5","9","3"]},
+{q:"عبارت 6a − 2a + 3a را ساده کن.",a:"7a",o:["7a","11a","5a","7"]},
+{q:"ضریب x در عبارت x − 8 چیست؟",a:"1",o:["1","8","−8","−1"]},
+{q:"معادله 4x − 8 = 12 را حل کن.",a:"5",o:["5","4","6","8"]},
+{q:"عبارت 9x + x − 4x را ساده کن.",a:"6x",o:["6x","14x","4x","10x"]},
+{q:"ضریب x در عبارت −3x + 2 چیست؟",a:"−3",o:["−3","2","3","−2"]},
+{q:"اگر 5x = 45 باشد، x چند است؟",a:"9",o:["9","8","10","5"]},
+{q:"عبارت 7x − 2x + 6x را ساده کن.",a:"11x",o:["11x","5x","9x","15x"]},
+{q:"معادله 3x + 4 = 19 را حل کن.",a:"5",o:["5","6","4","7"]},
+{q:"ضریب x در عبارت 15x − 7 چیست؟",a:"15",o:["15","7","8","−15"]},
+{q:"معادله 2x − 6 = 10 را حل کن.",a:"8",o:["8","7","6","10"]},
+{q:"عبارت 4a + 2b + 3a را ساده کن.",a:"7a + 2b",o:["7a + 2b","9ab","7a + 5b","12ab"]},
+{q:"معادله 4x + 3 = 2x + 11 را حل کن.",a:"4",o:["4","7","5","3"]},
+{q:"ضریب x در عبارت 5 − x چیست؟",a:"−1",o:["−1","1","5","−5"]},
+{q:"حاصل ساده‌شده 3(2x + 1) چیست؟",a:"6x + 3",o:["6x + 3","5x + 3","6x + 1","3x + 6"]},
+{q:"معادله 2(x + 3) = 14 را حل کن.",a:"4",o:["4","7","5","8"]},
+{q:"عبارت 5x + 3x − 2x + x را ساده کن.",a:"7x",o:["7x","11x","6x","9x"]},
+{q:"معادله 3x − 5 = 2x + 7 را حل کن.",a:"12",o:["12","2","7","−12"]},
+{q:"ضریب x در عبارت −11x − 4 چیست؟",a:"−11",o:["−11","11","−4","4"]},
+{q:"معادله 5x + 10 = 35 را حل کن.",a:"5",o:["5","7","9","25"]},
+{q:"عبارت 2x + 3x − 4x + 6x را ساده کن.",a:"7x",o:["7x","15x","5x","11x"]}
+];
+
+let player="",order=[],index=0,correct=0,wrong=0;
+let seconds=50,timerId=null,answered=false,startedAt=0,totalSeconds=0,audioCtx=null;
+const $=id=>document.getElementById(id);
+
+function shuffle(arr){
+const a=[...arr];
+for(let i=a.length-1;i>0;i--){
+const j=Math.floor(Math.random()*(i+1));
+[a[i],a[j]]=[a[j],a[i]];
+}
+return a;
+}
+function fa(n){return String(n).replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[d]);}
+
+function unlockAudio(){
+try{
+const C=window.AudioContext||window.webkitAudioContext;
+if(C){audioCtx=audioCtx||new C();if(audioCtx.state==="suspended")audioCtx.resume();}
+}catch(e){}
+}
+function tone(freq,duration,volume=0.07,wave="sine",delay=0){
+if(!audioCtx)return;
+const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+osc.type=wave;osc.frequency.value=freq;
+gain.gain.setValueAtTime(0.0001,audioCtx.currentTime+delay);
+gain.gain.exponentialRampToValueAtTime(volume,audioCtx.currentTime+delay+0.02);
+gain.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+delay+duration);
+osc.connect(gain);gain.connect(audioCtx.destination);
+osc.start(audioCtx.currentTime+delay);
+osc.stop(audioCtx.currentTime+delay+duration+0.1);
+}
+function sayPraise(){
+if(!("speechSynthesis" in window))return;
+speechSynthesis.cancel();
+const msg=new SpeechSynthesisUtterance("آفرین! عالی بود!");
+msg.lang="fa-IR";msg.rate=1;msg.pitch=1.1;
+speechSynthesis.speak(msg);
+}
+function playGood(){
+unlockAudio();
+tone(523,0.18,0.08,"triangle",0);
+tone(659,0.18,0.08,"triangle",0.16);
+tone(784,0.35,0.09,"triangle",0.32);
+sayPraise();
+}
+function playWrong(){unlockAudio();tone(220,0.25,0.05,"sine");}
+
+function playVictory(){
+unlockAudio();
+tone(523,0.3,0.09,"triangle",0);
+tone(659,0.3,0.09,"triangle",0.2);
+tone(784,0.3,0.09,"triangle",0.4);
+tone(1046,0.7,0.1,"triangle",0.6);
+for(let i=0;i<22;i++){
+setTimeout(()=>{
+if(!audioCtx)return;
+const buffer=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.045),audioCtx.sampleRate);
+const data=buffer.getChannelData(0);
+for(let j=0;j<data.length;j++)data[j]=(Math.random()*2-1)*Math.pow(1-j/data.length,3);
+const source=audioCtx.createBufferSource(),gain=audioCtx.createGain();
+source.buffer=buffer;gain.gain.value=0.13;
+source.connect(gain);gain.connect(audioCtx.destination);source.start();
+},i*110);
+}
+}
+function celebrate(){
+const area=$("celebration"),symbols=["🌸","🌟","✨","💐","⭐","🎉"];
+for(let i=0;i<45;i++){
+const p=document.createElement("div");
+p.className="particle";
+p.textContent=symbols[Math.floor(Math.random()*symbols.length)];
+p.style.left=Math.random()*100+"%";
+p.style.animationDuration=(2+Math.random()*3)+"s";
+area.appendChild(p);
+setTimeout(()=>p.remove(),5500);
+}
+}
+
+function startGame(){
+player=$("studentName").value.trim();
+if(!player){alert("لطفاً نام خودت را وارد کن.");return;}
+unlockAudio();
+$("welcome").classList.add("hidden");
+$("game").classList.remove("hidden");
+order=shuffle(questions.map((q,i)=>i));
+index=0;correct=0;wrong=0;startedAt=Date.now();
+showQuestion();
+}
+function showQuestion(){
+clearInterval(timerId);
+answered=false;seconds=50;
+const q=questions[order[index]];
+$("number").textContent=fa(index+1)+" / ۳۰";
+$("score").textContent=fa(correct);
+$("timer").textContent=fa(seconds);
+$("bar").style.width="100%";
+$("question").textContent=q.q;
+$("feedback").textContent="";
+$("next").classList.add("hidden");
+const box=$("options");
+box.innerHTML="";
+shuffle(q.o).forEach(option=>{
+const btn=document.createElement("button");
+btn.className="option";btn.textContent=option;
+btn.onclick=()=>checkAnswer(option,btn);
+box.appendChild(btn);
+});
+timerId=setInterval(()=>{
+seconds--;
+$("timer").textContent=fa(seconds);
+$("bar").style.width=(seconds/50*100)+"%";
+if(seconds<=0){clearInterval(timerId);timeUp();}
+},1000);
+}
+function checkAnswer(answer,selectedButton){
+if(answered)return;
+answered=true;clearInterval(timerId);
+const q=questions[order[index]];
+document.querySelectorAll(".option").forEach(btn=>{
+btn.disabled=true;
+if(btn.textContent===q.a)btn.classList.add("correct");
+});
+if(answer===q.a){
+correct++;
+$("feedback").textContent="آفرین! پاسخ درست بود 🌟";
+playGood();celebrate();
+}else{
+wrong++;selectedButton.classList.add("wrong");
+$("feedback").textContent="اشکالی نداره! جواب درست: "+q.a;
+playWrong();
+}
+$("score").textContent=fa(correct);
+$("next").classList.remove("hidden");
+}
+function timeUp(){
+if(answered)return;
+answered=true;wrong++;
+const q=questions[order[index]];
+document.querySelectorAll(".option").forEach(btn=>{
+btn.disabled=true;
+if(btn.textContent===q.a)btn.classList.add("correct");
+});
+$("feedback").textContent="زمان تمام شد! جواب درست: "+q.a;
+playWrong();$("next").classList.remove("hidden");
+}
+function nextQuestion(){
+if(!answered)return;
+index++;
+if(index>=questions.length)finishGame();
+else showQuestion();
+}
+function finishGame(){
+clearInterval(timerId);
+totalSeconds=Math.round((Date.now()-startedAt)/1000);
+$("game").classList.add("hidden");
+$("finish").classList.remove("hidden");
+const grade=Math.round((correct/questions.length)*200)/10;
+$("finalScore").textContent=fa(grade)+" از ۲۰";
+$("summary").textContent=player+" عزیز، "+fa(correct)+" پاسخ درست و "+fa(wrong)+" پاسخ نادرست داشتی.";
+$("saveStatus").textContent="در حال ذخیره نتیجه...";
+playVictory();celebrate();
+saveResult(grade);
+}
+async function saveResult(grade){
+if(!db||!auth||!auth.currentUser){
+$("saveStatus").textContent="نتیجه نمایش داده شد؛ اتصال ذخیره‌سازی برقرار نیست.";
+return;
+}
+try{
+await addDoc(collection(db,"results"),{
+name:player,score:grade,correct:correct,wrong:wrong,
+duration:totalSeconds,createdAt:serverTimestamp()
+});
+$("saveStatus").textContent="نتیجه با موفقیت ذخیره شد ✅";
+}catch(error){
+console.error(error);
+$("saveStatus").textContent="ذخیره نتیجه انجام نشد؛ اتصال را بررسی کنید.";
+}
+}
+window.startGame=startGame;
+window.nextQuestion=nextQuestion;
+</script>
+</body>
+</html>
